@@ -64,12 +64,12 @@ class Application(tk.Frame):
         for x, y, w, h in proc.contour_boxes(self.img_path):
 
             img = prepare_img(cv2.imread(self.img_path, cv2.IMREAD_GRAYSCALE)[y:y + h, x:x + w])
-            self.pred_values.append(self.model.predicted_value(img))
+            self.pred_values.append(str(self.model.predicted_value(img)))
             self.images.append(img)
 
         string = ""
         for val in self.pred_values:
-            string += str(val)
+            string += val
 
 
         self.display_text(string + "\nIs this correct?")
@@ -92,12 +92,12 @@ class Application(tk.Frame):
         operand = ""
         operation = -1
         for val in self.pred_values:
-            if val > 9:
+            if LABELS[val] > 9:
                 left = operand
                 operand = ""
-                operation = val
+                operation = LABELS[val]
             else:
-                operand += str(val)
+                operand += val
 
         self.display_text(left + " " + operation + " " + operand)
 
@@ -118,23 +118,16 @@ class Application(tk.Frame):
         ind = 0
 
         for i, val in enumerate(self.pred_values):
-            str_val = str(val)
-            corr_val = correct_expression[ind:ind + len(str_val)]
-            if str_val != corr:
+            corr_val = correct_expression[ind:ind + len(val)]
+            if val != corr_val:
                 self.model.compile()
-                if corr_val == "-":
-                    corr_val = 10
-                elif corr_val== "+":
-                    corr_val = 11
-                elif corr == "x":
-                    corr_val = 12
-                else:
-                    corr_val = int(corr)
 
-                self.model.train(self.images[i], np.reshape(corr_val, (1,)), epochs=1000)
+                corr_val = LABELS[corr_val]
+
+                self.model.train(self.images[i], np.reshape(corr_val, (1,)), epochs=100)
                 self.extract_vals()
 
-            ind += len(str_val)
+            ind += len(val)
 
         attributes = {"e1", "adjust"}
         self.clear(attributes)

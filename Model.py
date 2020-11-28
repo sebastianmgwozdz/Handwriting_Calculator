@@ -8,6 +8,22 @@ import os
 import cv2
 from sklearn.model_selection import train_test_split
 
+LABELS = {
+    '0': 0,
+    '1': 1,
+    '2': 2,
+    '3': 3,
+    '4': 4,
+    '5': 5,
+    '6': 6,
+    '7': 7,
+    '8': 8,
+    '9': 9,
+    '-': 10,
+    '+': 11,
+    'x': 12
+}
+
 
 class ConvolutionalNN:
     def __init__(self):
@@ -20,6 +36,8 @@ class ConvolutionalNN:
         self.model.add(layers.Flatten())
         self.model.add(layers.Dense(500, activation='relu'))
         self.model.add(layers.Dense(13, activation='softmax'))
+
+
 
     def compile(self):
         self.model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
@@ -60,7 +78,7 @@ def load_images_and_labels(directory, labels, dimensions):
     x = None
     y = []
     for folder in os.listdir(directory):
-        if folder.startswith("."):
+        if folder.startswith(".") or not labels.has_key(folder):
             continue
         images = load_images_from_folder(os.path.join(directory, folder), dimensions)
 
