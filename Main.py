@@ -58,15 +58,18 @@ class Application(tk.Frame):
 
         proc = ImageProcessor()
 
-        self.images = {}
+        self.pred_values = []
+        self.images = []
 
         for x, y, w, h in proc.contour_boxes(self.img_path):
+
             img = prepare_img(cv2.imread(self.img_path, cv2.IMREAD_GRAYSCALE)[y:y + h, x:x + w])
-            self.images[self.model.predicted_value(img)] = img
+            self.pred_values.append(self.model.predicted_value(img))
+            self.images.append(img)
 
         string = ""
-        for key in self.images:
-            string += str(key)
+        for val in self.pred_values:
+            string += str(val)
 
 
         self.display_text(string + "\nIs this correct?")
@@ -85,7 +88,18 @@ class Application(tk.Frame):
 
 
     def calculate(self):
-        return ""
+        left = ""
+        operand = ""
+        operation = -1
+        for val in self.pred_values:
+            if val > 9:
+                left = operand
+                operand = ""
+                operation = val
+            else:
+                operand += str(val)
+
+        self.display_text(left + " " + operation + " " + operand)
 
     def fix(self):
         attributes = {"text", "incorrect", "correct", "e1", "adjust"}
@@ -100,26 +114,27 @@ class Application(tk.Frame):
         self.adjust.pack()
 
     def refit(self):
-        correct_val = self.e1.get()
+        correct_expression = self.e1.get()
         ind = 0
 
-        for key in self.images:
-            str_key = str(key)
-            corr = correct_val[ind:ind + len(str_key)]
-            if str_key != corr:
+        for i, val in enumerate(self.pred_values):
+            str_val = str(val)
+            corr_val = correct_expression[ind:ind + len(str_val)]
+            if str_val != corr:
                 self.model.compile()
-                if corr == "-":
-                    corr = 10
-                elif corr== "+":
-                    corr = 11
+                if corr_val == "-":
+                    corr_val = 10
+                elif corr_val== "+":
+                    corr_val = 11
                 elif corr == "x":
-                    corr = 12
+                    corr_val = 12
                 else:
-                    corr = int(corr)
-                self.model.train(self.images[key], np.reshape(corr, (1,)), epochs=1000)
+                    corr_val = int(corr)
+
+                self.model.train(self.images[i], np.reshape(corr_val, (1,)), epochs=1000)
                 self.extract_vals()
 
-            ind += len(str_key)
+            ind += len(str_val)
 
         attributes = {"e1", "adjust"}
         self.clear(attributes)
@@ -188,7 +203,6 @@ def create_model():
 
         y_train = combine_rows(y_train, y_symbols_train)
 
-        print(x_train.shape)
 
         model.compile()
         model.train(x_train, y_train, epochs=2)
