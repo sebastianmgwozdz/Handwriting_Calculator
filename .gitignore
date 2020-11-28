@@ -1,3 +1,5 @@
 .DS_Store
 .idea/
 archive/.DS_Store
+model.h5
+model.json
