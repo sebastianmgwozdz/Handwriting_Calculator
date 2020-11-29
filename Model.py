@@ -9,19 +9,23 @@ import cv2
 from sklearn.model_selection import train_test_split
 
 LABELS = {
-    '0': 0,
-    '1': 1,
-    '2': 2,
-    '3': 3,
-    '4': 4,
-    '5': 5,
-    '6': 6,
-    '7': 7,
-    '8': 8,
-    '9': 9,
-    '-': 10,
-    '+': 11,
-    'x': 12
+    0: '0',
+    1: '1',
+    2: '2',
+    3: '3',
+    4: '4',
+    5: '5',
+    6: '6',
+    7: '7',
+    8: '8',
+    9: '9',
+    10: '-',
+    11: '+',
+    12: 'x',
+    13: '/',
+    14: '(',
+    15: ')'
+
 }
 
 
@@ -78,7 +82,7 @@ def load_images_and_labels(directory, labels, dimensions):
     x = None
     y = []
     for folder in os.listdir(directory):
-        if folder.startswith(".") or not labels.has_key(folder):
+        if folder.startswith(".") or not folder in labels:
             continue
         images = load_images_from_folder(os.path.join(directory, folder), dimensions)
 

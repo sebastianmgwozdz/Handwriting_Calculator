@@ -38,10 +38,10 @@ class Application(tk.Frame):
         self.img = ImageTk.PhotoImage(Image.open(self.img_path).resize((400, 400)))
 
         attributes = {"text", "incorrect", "correct", "e1", "adjust"}
-        self.clear(attributes)
+        clear(self, attributes)
 
 
-        if self.exists("img_panel"):
+        if hasattr(self, "img_panel"):
             self.img_panel.config(image=self.img)
             self.img_panel.photo_ref = self.img
         else:
@@ -52,7 +52,7 @@ class Application(tk.Frame):
 
 
     def extract_vals(self):
-        if not self.exists("img_path"):
+        if not hasattr(self, "img_path"):
             self.display_text("Must select an image first")
             return
 
@@ -64,46 +64,116 @@ class Application(tk.Frame):
         for x, y, w, h in proc.contour_boxes(self.img_path):
 
             img = prepare_img(cv2.imread(self.img_path, cv2.IMREAD_GRAYSCALE)[y:y + h, x:x + w])
-            self.pred_values.append(str(self.model.predicted_value(img)))
+            self.pred_values.append(self.model.predicted_value(img))
             self.images.append(img)
 
         string = ""
         for val in self.pred_values:
-            string += val
+            string += LABELS[val]
 
 
         self.display_text(string + "\nIs this correct?")
 
-        if not self.exists("incorrect"):
+        if not hasattr(self, "incorrect"):
             self.incorrect = tk.Button(self)
             self.incorrect["text"] = "No"
             self.incorrect["command"] = self.fix
         self.incorrect.pack()
 
-        if not self.exists("correct"):
+        if not hasattr(self, "correct"):
             self.correct = tk.Button(self)
             self.correct["text"] = "Yes"
             self.correct["command"] = self.calculate
         self.correct.pack()
 
 
-    def calculate(self):
-        left = ""
-        operand = ""
-        operation = -1
-        for val in self.pred_values:
-            if LABELS[val] > 9:
-                left = operand
-                operand = ""
-                operation = LABELS[val]
-            else:
-                operand += val
 
-        self.display_text(left + " " + operation + " " + operand)
+    def calculate(self):
+        self.display_text(self.elim_parenths(0)[0])
+
+    def elim_parenths(self, start):
+        stack = []
+        i = start
+        end = -1
+        while i < len(self.pred_values):
+            val = self.pred_values[i]
+
+            if val == 14:
+                x = self.elim_parenths(i + 1)
+                stack.append(x[0])
+                i = x[1]
+                continue
+            if val == 15:
+                end = i
+                break
+            print(val)
+            if val > 9:
+                num = 0
+                while len(stack) > 0 and isinstance(stack[-1], int):
+                    num *= 10
+                    num += stack[-1]
+                    stack.pop()
+
+                stack.append(num)
+
+                stack.append(LABELS[val])
+            else:
+                stack.append(val)
+
+
+            i += 1
+
+        print(stack)
+
+        m_d_rem = self.elim_mult_div(stack)
+
+        print(m_d_rem)
+
+        a_s_rem = self.elim_add_sub(m_d_rem)
+
+        print(a_s_rem)
+
+        return a_s_rem.pop(), end + 1
+
+    def elim_mult_div(self, stack):
+        i = 0
+        while i < len(stack):
+            val = stack[i]
+            if val == "x":
+                first = stack.pop(i - 1)
+                stack.pop(i - 1)
+                second = stack.pop(i - 1)
+                stack.insert(i - 1, first * second)
+            elif val == "/":
+                first = stack.pop(i - 1)
+                stack.pop(i - 1)
+                second = stack.pop(i - 1)
+                stack.insert(i - 1, first / second)
+            else:
+                i += 1
+        return stack
+
+    def elim_add_sub(self, stack):
+        i = 0
+        while i < len(stack):
+            val = stack[i]
+            if val == "+":
+                first = stack.pop(i - 1)
+                stack.pop(i - 1)
+                second = stack.pop(i - 1)
+                stack.insert(i - 1, first + second)
+            elif val == "-":
+                first = stack.pop(i - 1)
+                stack.pop(i - 1)
+                second = stack.pop(i - 1)
+                stack.insert(i - 1, first - second)
+            else:
+                i += 1
+        return stack
 
     def fix(self):
         attributes = {"text", "incorrect", "correct", "e1", "adjust"}
-        self.clear(attributes)
+        clear(self, attributes)
 
         self.e1 = tk.Entry(self)
         self.e1.pack()
@@ -118,19 +188,37 @@ class Application(tk.Frame):
         ind = 0
 
         for i, val in enumerate(self.pred_values):
+
             corr_val = correct_expression[ind:ind + len(val)]
-            if val != corr_val:
+            if LABELS[val] != corr_val:
                 self.model.compile()
 
-                corr_val = LABELS[corr_val]
+                # CLEAN THIS UP WITH AN ARRAY OR DICT (val = index + 10)
+
+                if corr_val == "-":
+                    corr_val = 10
+                elif corr_val == "+":
+                    corr_val = 11
+                elif corr_val == "x":
+                    corr_val = 12
+                elif corr_val == "/":
+                    corr_val = 13
+                elif corr_val == "(":
+                    corr_val = 14
+                elif corr_val == ")":
+                    corr_val = 15
+                else:
+                    corr_val = int(corr_val)
+
 
                 self.model.train(self.images[i], np.reshape(corr_val, (1,)), epochs=100)
+                self.model.save('model.json', "model.h5")
                 self.extract_vals()
 
-            ind += len(val)
+            ind += len(LABELS[val])
 
         attributes = {"e1", "adjust"}
-        self.clear(attributes)
+        clear(self, attributes)
 
 
     def browse_file(self):
@@ -138,14 +226,15 @@ class Application(tk.Frame):
                                    filetypes=(("jpg files", "*.jpg"), ("all files", "*.*"), ("jpeg", "*.jpeg"), ("png", "*.png")))
         self.show_image()
 
-    def exists(self, attr):
-        return hasattr(self, attr)
 
-    def clear(self, attributes):
-        for attr in attributes:
-            if self.exists(attr):
-                elem = getattr(self, attr)
-                elem.pack_forget()
+
+
+
+def clear(obj, attributes):
+    for attr in attributes:
+        if hasattr(obj, attr):
+            elem = getattr(obj, attr)
+            elem.pack_forget()
 
 
 
