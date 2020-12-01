@@ -32,12 +32,10 @@ class Application(tk.Frame):
         self.text = tk.Label(self, text=text)
         self.text.pack()
 
-
-
     def show_image(self):
         self.img = ImageTk.PhotoImage(Image.open(self.img_path).resize((400, 400)))
 
-        attributes = {"text", "incorrect", "correct", "e1", "adjust"}
+        attributes = {"text", "incorrect_btn", "correct_btn", "e1", "adjust"}
         clear(self, attributes)
 
 
@@ -47,9 +45,6 @@ class Application(tk.Frame):
         else:
             self.img_panel = tk.Label(self, image=self.img)
             self.img_panel.pack(side="bottom")
-
-
-
 
     def extract_vals(self):
         if not hasattr(self, "img_path"):
@@ -74,105 +69,29 @@ class Application(tk.Frame):
 
         self.display_text(string + "\nIs this correct?")
 
-        if not hasattr(self, "incorrect"):
-            self.incorrect = tk.Button(self)
-            self.incorrect["text"] = "No"
-            self.incorrect["command"] = self.fix
-        self.incorrect.pack()
+        if not hasattr(self, "incorrect_btn"):
+            self.incorrect_btn = tk.Button(self)
+            self.incorrect_btn["text"] = "No"
+            self.incorrect_btn["command"] = self.incorrect
+        self.incorrect_btn.pack()
 
-        if not hasattr(self, "correct"):
-            self.correct = tk.Button(self)
-            self.correct["text"] = "Yes"
-            self.correct["command"] = self.calculate
-        self.correct.pack()
-
-
-
-    def calculate(self):
-        self.display_text(self.elim_parenths(0)[0])
-
-    def elim_parenths(self, start):
-        stack = []
-        i = start
-        end = -1
-        while i < len(self.pred_values):
-            val = self.pred_values[i]
-
-            if val == 14:
-                x = self.elim_parenths(i + 1)
-                stack.append(x[0])
-                i = x[1]
-                continue
-            if val == 15:
-                end = i
-                break
-            print(val)
-            if val > 9:
-                num = 0
-                while len(stack) > 0 and isinstance(stack[-1], int):
-                    num *= 10
-                    num += stack[-1]
-                    stack.pop()
-
-                stack.append(num)
-
-                stack.append(LABELS[val])
-            else:
-                stack.append(val)
+        if not hasattr(self, "correct_btn"):
+            self.correct_btn = tk.Button(self)
+            self.correct_btn["text"] = "Yes"
+            self.correct_btn["command"] = self.correct
+        self.correct_btn.pack()
 
 
-            i += 1
 
-        print(stack)
+    def correct(self):
+        answer = elim_parenths(self.pred_values, 0)[0]
+        self.display_text(answer)
 
-        m_d_rem = self.elim_mult_div(stack)
+        self.refit(self.pred_values)
 
-        print(m_d_rem)
 
-        a_s_rem = self.elim_add_sub(m_d_rem)
-
-        print(a_s_rem)
-
-        return a_s_rem.pop(), end + 1
-
-    def elim_mult_div(self, stack):
-        i = 0
-        while i < len(stack):
-            val = stack[i]
-            if val == "x":
-                first = stack.pop(i - 1)
-                stack.pop(i - 1)
-                second = stack.pop(i - 1)
-                stack.insert(i - 1, first * second)
-            elif val == "/":
-                first = stack.pop(i - 1)
-                stack.pop(i - 1)
-                second = stack.pop(i - 1)
-                stack.insert(i - 1, first / second)
-            else:
-                i += 1
-        return stack
-
-    def elim_add_sub(self, stack):
-        i = 0
-        while i < len(stack):
-            val = stack[i]
-            if val == "+":
-                first = stack.pop(i - 1)
-                stack.pop(i - 1)
-                second = stack.pop(i - 1)
-                stack.insert(i - 1, first + second)
-            elif val == "-":
-                first = stack.pop(i - 1)
-                stack.pop(i - 1)
-                second = stack.pop(i - 1)
-                stack.insert(i - 1, first - second)
-            else:
-                i += 1
-        return stack
-
-    def fix(self):
-        attributes = {"text", "incorrect", "correct", "e1", "adjust"}
+    def incorrect(self):
+        attributes = {"text", "incorrect_btn", "correct_btn", "e1", "adjust"}
         clear(self, attributes)
 
         self.e1 = tk.Entry(self)
@@ -180,42 +99,35 @@ class Application(tk.Frame):
 
         self.adjust = tk.Button(self)
         self.adjust["text"] = "Train"
-        self.adjust["command"] = self.refit
+        self.adjust["command"] = lambda: self.refit(self.e1.get().split())
         self.adjust.pack()
 
-    def refit(self):
-        correct_expression = self.e1.get()
-        ind = 0
+    def refit(self, correct_vals):
 
-        for i, val in enumerate(self.pred_values):
+        if (len(correct_vals) != len(self.pred_values)):
+            self.display_text("Error in input format, please try a different image")
+        else:
+            x = None
+            y = []
+            for i, val in enumerate(self.pred_values):
+                corr_val = correct_vals[i]
 
-            corr_val = correct_expression[ind:ind + len(val)]
-            if LABELS[val] != corr_val:
-                self.model.compile()
-
-                # CLEAN THIS UP WITH AN ARRAY OR DICT (val = index + 10)
-
-                if corr_val == "-":
-                    corr_val = 10
-                elif corr_val == "+":
-                    corr_val = 11
-                elif corr_val == "x":
-                    corr_val = 12
-                elif corr_val == "/":
-                    corr_val = 13
-                elif corr_val == "(":
-                    corr_val = 14
-                elif corr_val == ")":
-                    corr_val = 15
+                if x is None:
+                    x = self.images[i]
                 else:
-                    corr_val = int(corr_val)
+                    x = combine_rows(x, self.images[i])
+
+                for key in LABELS:
+                    if LABELS[key] == corr_val:
+                        y.append(key)
 
 
-                self.model.train(self.images[i], np.reshape(corr_val, (1,)), epochs=100)
-                self.model.save('model.json', "model.h5")
-                self.extract_vals()
 
-            ind += len(LABELS[val])
+            self.model.compile()
+            self.model.train(x, np.reshape(y, (len(y),)), epochs=50)
+            self.model.save('model.json', "model.h5")
+            self.extract_vals()
+
 
         attributes = {"e1", "adjust"}
         clear(self, attributes)
@@ -228,15 +140,61 @@ class Application(tk.Frame):
 
 
 
+def elim_parenths(pred_values, start):
+    stack = []
+    i = start
+    end = -1
+    while i < len(pred_values):
+        val = pred_values[i]
 
+        if val == 14:
+            x = elim_parenths(i + 1)
+            stack.append(x[0])
+            i = x[1]
+            continue
+        if val == 15:
+            end = i
+            break
+        if val > 9:
+            num = 0
+            while len(stack) > 0 and isinstance(stack[-1], int):
+                num *= 10
+                num += stack[-1]
+                stack.pop()
+
+            stack.append(num)
+
+            stack.append(LABELS[val])
+        else:
+            stack.append(val)
+
+        i += 1
+
+    m_d_rem = eval_pemdas(stack, {'*': lambda a,b: a * b, '/': lambda a,b: a / b})
+
+    a_s_rem = eval_pemdas(m_d_rem, {'+': lambda a,b: a + b, '-': lambda a,b: a - b})
+
+    return a_s_rem.pop(), end + 1
+
+def eval_pemdas(stack, resolve_vals):
+    i = 0
+    while i < len(stack):
+        val = stack[i]
+        if val in resolve_vals:
+            first = stack.pop(i - 1)
+            stack.pop(i - 1)
+            second = stack.pop(i - 1)
+
+            stack.insert(i - 1, dict[val](first, second))
+        else:
+            i += 1
+    return stack
 
 def clear(obj, attributes):
     for attr in attributes:
         if hasattr(obj, attr):
             elem = getattr(obj, attr)
             elem.pack_forget()
-
-
 
 def prepare_img(img):
     img = cv2.bitwise_not(img)

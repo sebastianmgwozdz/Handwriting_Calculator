@@ -29,6 +29,8 @@ LABELS = {
 }
 
 
+
+
 class ConvolutionalNN:
     def __init__(self):
         self.model = models.Sequential()
